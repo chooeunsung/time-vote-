@@ -1,3 +1,19 @@
+// 선택한 datetime을 10분 단위로 스냅
+function snapTo10Min(input) {
+  if (!input.value) return;
+  const d = new Date(input.value);
+  const snapped = Math.round(d.getMinutes() / 10) * 10;
+  if (snapped === 60) {
+    d.setHours(d.getHours() + 1);
+    d.setMinutes(0);
+  } else {
+    d.setMinutes(snapped);
+  }
+  d.setSeconds(0);
+  const pad = n => String(n).padStart(2, '0');
+  input.value = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
 // ---- Home ----
 
 function renderHome() {
@@ -176,11 +192,13 @@ function renderCreatePoll() {
         <input type="text" id="poll-section" placeholder="예: 01분반" />
 
         <label>투표 마감 일시 <span class="required">*</span></label>
-        <input type="datetime-local" id="poll-deadline" min="${nowStr}" />
+        <input type="datetime-local" id="poll-deadline" min="${nowStr}" step="600"
+               onchange="snapTo10Min(this)" />
 
         <label>후보 시간대 <span class="required">*</span></label>
         <div class="slot-input-row">
-          <input type="datetime-local" id="slot-input" style="flex:1;" />
+          <input type="datetime-local" id="slot-input" style="flex:1;" step="600"
+                 onchange="snapTo10Min(this)" />
           <button class="btn btn-sm btn-outline" onclick="addSlot()">+ 추가</button>
         </div>
         <div id="slot-list" class="slot-list">
