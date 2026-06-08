@@ -249,5 +249,4 @@ async function startNgrok(port) {
 
 function printNgrokUrl(publicUrl) {
   console.log(`ngrok 공개 주소    → ${publicUrl}`);
-  console.log('\n학생들에게 위 주소를 공유하세요!\n');
 }
