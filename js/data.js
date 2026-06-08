@@ -86,10 +86,12 @@ const db = {
 
 async function api(method, path, body) {
   try {
+    const headers = { 'ngrok-skip-browser-warning': 'true' };
+    if (body) headers['Content-Type'] = 'application/json';
     const opts = {
       method,
-      headers: body ? { 'Content-Type': 'application/json' } : {},
-      body:    body ? JSON.stringify(body) : undefined,
+      headers,
+      body: body ? JSON.stringify(body) : undefined,
     };
     const res  = await fetch(path, opts);
     const data = await res.json();
