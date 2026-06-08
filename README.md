@@ -21,18 +21,16 @@ node server.js
 
 ### 외부 공유 (ngrok)
 
-같은 네트워크가 아닌 다른 기기(학생 스마트폰 등)와 공유하려면 ngrok을 사용합니다.
+같은 네트워크 밖의 다른 기기(학생 스마트폰 등)와 공유하려면 ngrok이 필요합니다.  
+`node server.js` 실행 시 ngrok이 자동으로 시작되며, 터미널에 공개 주소가 출력됩니다.
 
-```bash
-# 터미널 1: 서버 실행
-node server.js
-
-# 터미널 2: ngrok 터널 생성
-npx ngrok http 8080
+```
+ngrok 공개 주소    → https://xxxx.ngrok-free.app
 ```
 
-ngrok이 출력하는 `https://xxxx.ngrok-free.app` 주소를 학생들에게 공유하면 됩니다.  
-교수와 학생 모두 같은 서버에 접속하므로 데이터가 실시간으로 공유됩니다.
+해당 주소를 학생들에게 공유하면 됩니다. 교수와 학생 모두 같은 서버에 접속하므로 데이터가 실시간으로 공유됩니다.
+
+> ngrok을 별도로 실행하지 마세요. 서버와 ngrok을 동시에 두 개 실행하면 충돌이 발생합니다.
 
 ---
 
@@ -55,6 +53,18 @@ ngrok이 출력하는 `https://xxxx.ngrok-free.app` 주소를 학생들에게 �
 3. 참석 **불가능한** 시간대만 체크
 4. **투표 제출** 클릭
 5. 같은 학번으로 재제출하면 기존 투표가 수정됩니다
+
+---
+
+### DB 초기화
+
+데이터를 모두 초기화하려면 아래 스크립트를 실행하세요.
+
+```bash
+python3 init_db.py
+```
+
+세 JSON 파일(`db_professors.json`, `db_polls.json`, `db_votes.json`)이 빈 배열로 초기화됩니다.
 
 ---
 
