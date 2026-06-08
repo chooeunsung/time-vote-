@@ -1,3 +1,9 @@
+function showLoading() {
+  document.getElementById('main').innerHTML = `
+    <div class="loading-wrap"><div class="spinner"></div></div>
+  `;
+}
+
 function nav(path) {
   location.hash = path;
 }

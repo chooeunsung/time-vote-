@@ -534,6 +534,23 @@ input[readonly] {
 .link        { color: var(--primary); font-weight: 600; cursor: pointer; }
 .link:hover  { text-decoration: underline; }
 
+/* ---- Loading spinner ---- */
+.loading-wrap {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 40vh;
+}
+.spinner {
+  width: 36px;
+  height: 36px;
+  border: 3px solid var(--border);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: spin .7s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
 /* ---- Animation ---- */
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(8px); }

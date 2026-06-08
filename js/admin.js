@@ -3,12 +3,8 @@ function snapTo10Min(input) {
   if (!input.value) return;
   const d = new Date(input.value);
   const snapped = Math.round(d.getMinutes() / 10) * 10;
-  if (snapped === 60) {
-    d.setHours(d.getHours() + 1);
-    d.setMinutes(0);
-  } else {
-    d.setMinutes(snapped);
-  }
+  if (snapped === 60) { d.setHours(d.getHours() + 1); d.setMinutes(0); }
+  else d.setMinutes(snapped);
   d.setSeconds(0);
   const pad = n => String(n).padStart(2, '0');
   input.value = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
@@ -41,19 +37,14 @@ function renderLogin() {
       <div class="card">
         <h1 class="page-title">교수 로그인</h1>
         <p class="page-sub">투표 공간을 개설하려면 로그인이 필요합니다.</p>
-
         <label>이메일</label>
         <input type="email" id="login-email" placeholder="professor@sejong.ac.kr" autocomplete="email" />
-
         <label>비밀번호</label>
         <input type="password" id="login-pw" placeholder="••••••••" autocomplete="current-password"
                onkeydown="if(event.key==='Enter')doLogin()" />
-
         <button class="btn btn-primary btn-full" onclick="doLogin()">로그인</button>
-
         <p class="text-center mt-16 text-sub">
-          아직 계정이 없으신가요?
-          <a href="#signup" class="link">회원가입</a>
+          아직 계정이 없으신가요? <a href="#signup" class="link">회원가입</a>
         </p>
       </div>
     </div>
@@ -63,14 +54,12 @@ function renderLogin() {
 
 async function doLogin() {
   const email = document.getElementById('login-email').value.trim();
-  const pw = document.getElementById('login-pw').value;
+  const pw    = document.getElementById('login-pw').value;
   if (!email || !pw) return alert('이메일과 비밀번호를 모두 입력해주세요.');
   try {
     await db.login(email, pw);
     nav('dashboard');
-  } catch (e) {
-    alert(e.message);
-  }
+  } catch (e) { alert(e.message); }
 }
 
 // ---- Signup ----
@@ -81,25 +70,18 @@ function renderSignup() {
       <div class="card">
         <h1 class="page-title">교수 회원가입</h1>
         <p class="page-sub">세종대학교 이메일(@sejong.ac.kr)로만 가입 가능합니다.</p>
-
         <label>교수명 <span class="required">*</span></label>
         <input type="text" id="su-name" placeholder="예: 홍길동" />
-
         <label>이메일 <span class="required">*</span></label>
         <input type="email" id="su-email" placeholder="professor@sejong.ac.kr" autocomplete="email" />
-
         <label>비밀번호 <span class="required">*</span></label>
         <input type="password" id="su-pw" placeholder="8자 이상" autocomplete="new-password" />
-
         <label>비밀번호 확인 <span class="required">*</span></label>
         <input type="password" id="su-pw2" placeholder="비밀번호 재입력" autocomplete="new-password"
                onkeydown="if(event.key==='Enter')doSignup()" />
-
         <button class="btn btn-primary btn-full" onclick="doSignup()">가입하기</button>
-
         <p class="text-center mt-16 text-sub">
-          이미 계정이 있으신가요?
-          <a href="#login" class="link">로그인</a>
+          이미 계정이 있으신가요? <a href="#login" class="link">로그인</a>
         </p>
       </div>
     </div>
@@ -117,15 +99,15 @@ async function doSignup() {
     await db.signup(email, pw, name);
     alert('회원가입이 완료되었습니다! 로그인해주세요.');
     nav('login');
-  } catch (e) {
-    alert(e.message);
-  }
+  } catch (e) { alert(e.message); }
 }
 
 // ---- Dashboard ----
 
-function renderDashboard() {
-  const polls = db.getMyPolls().slice().reverse();
+async function renderDashboard() {
+  showLoading();
+  const polls = await db.getMyPolls();
+  polls.reverse();
 
   const pollsHtml = polls.length === 0
     ? `<div class="empty-state">
@@ -134,11 +116,11 @@ function renderDashboard() {
         <a href="#create" class="btn btn-primary">첫 투표 개설하기</a>
        </div>`
     : polls.map(poll => {
-        const expired = isExpired(poll);
-        const status = expired
+        const expired    = isExpired(poll);
+        const status     = expired
           ? '<span class="badge badge-gray">마감</span>'
           : '<span class="badge badge-green">진행 중</span>';
-        const deadline = poll.deadline ? fmtDt(poll.deadline) : '기한 없음';
+        const deadline   = poll.deadline ? fmtDt(poll.deadline) : '기한 없음';
         const sectionTag = poll.section ? ` <span class="section-tag">[${poll.section}]</span>` : '';
         return `
           <div class="poll-card" onclick="nav('poll/${poll.id}')">
@@ -148,11 +130,10 @@ function renderDashboard() {
             </div>
             <div class="poll-card-right">
               ${status}
-              <span class="poll-card-votes">${poll.votes.length}명 참여</span>
+              <span class="poll-card-votes">${poll.voteCount ?? 0}명 참여</span>
               <span class="arrow-icon">→</span>
             </div>
-          </div>
-        `;
+          </div>`;
       }).join('');
 
   document.getElementById('main').innerHTML = `
@@ -217,8 +198,7 @@ function addSlot() {
   const d = new Date(inp.value);
   const timeText =
     d.toLocaleDateString('ko-KR', { month: 'long', day: 'numeric', weekday: 'short' }) +
-    ' ' +
-    d.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
+    ' ' + d.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
   const id = Date.now();
   tempSlots.push({ id, timeText, datetime: inp.value });
   inp.value = '';
@@ -233,36 +213,37 @@ function removeSlot(id) {
 function renderTempSlots() {
   const el = document.getElementById('slot-list');
   if (tempSlots.length === 0) {
-    el.innerHTML = '<p class="empty-hint">추가된 시간대가 없습니다.</p>';
-    return;
+    el.innerHTML = '<p class="empty-hint">추가된 시간대가 없습니다.</p>'; return;
   }
   el.innerHTML = tempSlots.map(s => `
     <div class="slot-row">
       <span>${s.timeText}</span>
       <button class="btn-remove" onclick="removeSlot(${s.id})">×</button>
-    </div>
-  `).join('');
+    </div>`).join('');
 }
 
-function createPoll() {
+async function createPoll() {
   const pollName = document.getElementById('poll-name').value.trim();
   const section  = document.getElementById('poll-section').value.trim();
   const deadline = document.getElementById('poll-deadline').value;
-  if (!pollName) return alert('과목명을 입력해주세요.');
-  if (!deadline) return alert('투표 마감 일시를 설정해주세요.');
-  if (tempSlots.length === 0) return alert('후보 시간대를 최소 1개 이상 추가해주세요.');
-  const poll = db.createPoll({
-    pollName, section,
-    slots: [...tempSlots],
-    deadline: new Date(deadline).toISOString()
-  });
-  nav(`poll/${poll.id}`);
+  if (!pollName)          return alert('과목명을 입력해주세요.');
+  if (!deadline)          return alert('투표 마감 일시를 설정해주세요.');
+  if (!tempSlots.length)  return alert('후보 시간대를 최소 1개 이상 추가해주세요.');
+  try {
+    const poll = await db.createPoll({
+      pollName, section,
+      slots: [...tempSlots],
+      deadline: new Date(deadline).toISOString(),
+    });
+    nav(`poll/${poll.id}`);
+  } catch (e) { alert(e.message); }
 }
 
-// ---- Poll Management (link + QR + results) ----
+// ---- Poll Management ----
 
-function renderPollManage(pollId) {
-  const poll = db.getPoll(pollId);
+async function renderPollManage(pollId) {
+  showLoading();
+  const poll = await db.getPoll(pollId);
   const main = document.getElementById('main');
 
   if (!poll) {
@@ -286,15 +267,14 @@ function renderPollManage(pollId) {
           불가 응답 ${poll.votes.filter(v => v.impossibleSlots.includes(optimal.id)).length}명
           (전체 ${poll.votes.length}명 중)
         </div>
-       </div>`
-    : '';
+       </div>` : '';
 
   const slotsHtml = poll.slots.map(slot => {
     const impossibleVoters = poll.votes.filter(v => v.impossibleSlots.includes(slot.id));
     const count = impossibleVoters.length;
     const pct   = poll.votes.length === 0 ? 0 : Math.round((count / poll.votes.length) * 100);
     const isOpt = optimal && slot.id === optimal.id;
-    const voterChips = count > 0
+    const chips = count > 0
       ? impossibleVoters.map(v => `<span class="voter-chip">${v.voterName}(${v.voterId})</span>`).join('')
       : '<span class="all-ok">전원 참석 가능</span>';
     return `
@@ -304,27 +284,23 @@ function renderPollManage(pollId) {
             ${slot.timeText}
             ${isOpt ? '<span class="badge badge-primary">✓ 추천</span>' : ''}
           </span>
-          <span class="result-count">
-            불가 ${count}명 <span class="badge badge-red">${pct}%</span>
-          </span>
+          <span class="result-count">불가 ${count}명 <span class="badge badge-red">${pct}%</span></span>
         </div>
         <div class="bar-bg">
           <div class="bar-fill ${isOpt ? 'bar-optimal' : ''}" style="width:${pct}%;"></div>
         </div>
-        <div class="names-row">${voterChips}</div>
-      </div>
-    `;
+        <div class="names-row">${chips}</div>
+      </div>`;
   }).join('');
 
-  const sectionTag = poll.section ? ` <span class="section-tag">[${poll.section}]</span>` : '';
-  const statusHtml = expired
+  const sectionTag  = poll.section ? ` <span class="section-tag">[${poll.section}]</span>` : '';
+  const statusHtml  = expired
     ? '<span class="status-expired">투표 마감됨</span>'
     : '<span class="status-active">투표 진행 중</span>';
 
   main.innerHTML = `
     <div class="container">
       <a href="#dashboard" class="btn-back">← 내 투표 목록</a>
-
       <div class="page-header" style="margin-top:16px;">
         <div>
           <h1 class="page-title">${poll.pollName}${sectionTag}</h1>
@@ -354,8 +330,7 @@ function renderPollManage(pollId) {
         </h2>
         ${poll.votes.length === 0
           ? '<p class="empty-hint">아직 투표 참여자가 없습니다.</p>'
-          : slotsHtml
-        }
+          : slotsHtml}
       </div>
     </div>
   `;
@@ -363,12 +338,9 @@ function renderPollManage(pollId) {
   const qrBox = document.getElementById('qr-box');
   if (typeof QRCode !== 'undefined') {
     new QRCode(qrBox, {
-      text: voteUrl,
-      width: 160,
-      height: 160,
-      colorDark: '#111827',
-      colorLight: '#ffffff',
-      correctLevel: QRCode.CorrectLevel.M
+      text: voteUrl, width: 160, height: 160,
+      colorDark: '#111827', colorLight: '#ffffff',
+      correctLevel: QRCode.CorrectLevel.M,
     });
   } else {
     qrBox.innerHTML = '<p class="empty-hint">QR 생성 불가 (인터넷 연결 필요)</p>';
@@ -379,33 +351,27 @@ function copyVoteLink(btn) {
   const url = document.getElementById('vote-url-input').value;
   const fallback = () => {
     const ta = document.createElement('textarea');
-    ta.value = url;
-    ta.style.cssText = 'position:fixed;opacity:0;';
-    document.body.appendChild(ta);
-    ta.select();
-    document.execCommand('copy');
-    document.body.removeChild(ta);
+    ta.value = url; ta.style.cssText = 'position:fixed;opacity:0;';
+    document.body.appendChild(ta); ta.select();
+    document.execCommand('copy'); document.body.removeChild(ta);
     flashCopied(btn);
   };
   if (navigator.clipboard && window.isSecureContext) {
     navigator.clipboard.writeText(url).then(() => flashCopied(btn)).catch(fallback);
-  } else {
-    fallback();
-  }
+  } else { fallback(); }
 }
 
 function flashCopied(btn) {
   const orig = btn.textContent;
   btn.textContent = '복사됨 ✓';
   btn.style.cssText = 'background:var(--success-bg);color:var(--success);border-color:var(--success-bg);';
-  setTimeout(() => {
-    btn.textContent = orig;
-    btn.style.cssText = '';
-  }, 2000);
+  setTimeout(() => { btn.textContent = orig; btn.style.cssText = ''; }, 2000);
 }
 
-function confirmDeletePoll(pollId) {
+async function confirmDeletePoll(pollId) {
   if (!confirm('이 투표를 삭제하시겠습니까? 복구할 수 없습니다.')) return;
-  db.deletePoll(pollId);
-  nav('dashboard');
+  try {
+    await db.deletePoll(pollId);
+    nav('dashboard');
+  } catch (e) { alert(e.message); }
 }

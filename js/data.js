@@ -1,123 +1,103 @@
-const STORAGE_KEY = 'examPoll_v7';
 const SESSION_KEY = 'examPoll_session';
 
 const db = {
   session: null,
 
-  _read() {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      return raw ? JSON.parse(raw) : { registeredProfs: [], polls: [] };
-    } catch {
-      return { registeredProfs: [], polls: [] };
-    }
-  },
-
-  _write(data) {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-  },
-
   loadSession() {
     try {
       const raw = localStorage.getItem(SESSION_KEY);
       if (raw) this.session = JSON.parse(raw);
-    } catch {
-      this.session = null;
-    }
+    } catch { this.session = null; }
   },
 
-  isLoggedIn() {
-    return this.session !== null;
-  },
-
-  async signup(email, password, name) {
-    if (!email.endsWith('@sejong.ac.kr')) {
-      throw new Error('세종대학교 이메일(@sejong.ac.kr)만 가입 가능합니다.');
-    }
-    if (password.length < 8) {
-      throw new Error('비밀번호는 8자 이상이어야 합니다.');
-    }
-    const data = this._read();
-    if (data.registeredProfs.some(p => p.email === email)) {
-      throw new Error('이미 가입된 이메일입니다.');
-    }
-    const pw = await hashPw(password);
-    data.registeredProfs.push({ email, pw, name });
-    this._write(data);
-  },
-
-  async login(email, password) {
-    const data = this._read();
-    const pw = await hashPw(password);
-    const prof = data.registeredProfs.find(p => p.email === email && p.pw === pw);
-    if (!prof) throw new Error('이메일 또는 비밀번호가 올바르지 않습니다.');
-    this.session = { email: prof.email, name: prof.name };
-    localStorage.setItem(SESSION_KEY, JSON.stringify(this.session));
-  },
+  isLoggedIn() { return this.session !== null; },
 
   logout() {
     this.session = null;
     localStorage.removeItem(SESSION_KEY);
   },
 
-  getMyPolls() {
+  // ── Auth ────────────────────────────────────────────────────────────────
+
+  async signup(email, password, name) {
+    if (password.length < 8) throw new Error('비밀번호는 8자 이상이어야 합니다.');
+    const pw  = await hashPw(password);
+    const res = await api('POST', '/api/auth/signup', { email, pw, name });
+    if (!res.ok) throw new Error(res.error);
+  },
+
+  async login(email, password) {
+    const pw  = await hashPw(password);
+    const res = await api('POST', '/api/auth/login', { email, pw });
+    if (!res.ok) throw new Error(res.error);
+    this.session = { email: res.data.email, name: res.data.name };
+    localStorage.setItem(SESSION_KEY, JSON.stringify(this.session));
+  },
+
+  // ── Polls ────────────────────────────────────────────────────────────────
+
+  async getAllPolls() {
+    const res = await api('GET', '/api/polls');
+    return res.ok ? res.data : [];
+  },
+
+  async getMyPolls() {
     if (!this.session) return [];
-    return this._read().polls.filter(p => p.profEmail === this.session.email);
+    const polls = await this.getAllPolls();
+    return polls.filter(p => p.profEmail === this.session.email);
   },
 
-  getAllPolls() {
-    return this._read().polls;
+  async getPoll(id) {
+    const res = await api('GET', `/api/polls/${id}`);
+    return res.ok ? res.data : null;
   },
 
-  getPoll(id) {
-    return this._read().polls.find(p => p.id === id) || null;
-  },
-
-  createPoll({ pollName, section, slots, deadline }) {
-    const data = this._read();
-    const poll = {
-      id: genId(),
+  async createPoll({ pollName, section, slots, deadline }) {
+    const body = {
+      id:        genId(),
       profEmail: this.session.email,
-      profName: this.session.name,
+      profName:  this.session.name,
       pollName,
-      section: section || '',
+      section:   section || '',
       slots,
       deadline,
-      votes: [],
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
     };
-    data.polls.push(poll);
-    this._write(data);
-    return poll;
+    const res = await api('POST', '/api/polls', body);
+    if (!res.ok) throw new Error(res.error);
+    return res.data;
   },
 
-  deletePoll(id) {
-    const data = this._read();
-    data.polls = data.polls.filter(p => p.id !== id);
-    this._write(data);
+  async deletePoll(id) {
+    const res = await api('DELETE', `/api/polls/${id}`);
+    if (!res.ok) throw new Error(res.error);
   },
 
-  submitVote(pollId, { voterName, voterId, impossibleSlots }) {
-    const data = this._read();
-    const poll = data.polls.find(p => p.id === pollId);
-    if (!poll) throw new Error('투표를 찾을 수 없습니다.');
-    if (isExpired(poll)) throw new Error('투표 기한이 마감되었습니다.');
-
-    const idx = poll.votes.findIndex(v => v.voterId === voterId);
-    const vote = {
-      voterName,
-      voterId,
-      impossibleSlots: [...impossibleSlots],
-      submittedAt: new Date().toISOString()
-    };
-    if (idx !== -1) {
-      poll.votes[idx] = vote;
-    } else {
-      poll.votes.push(vote);
-    }
-    this._write(data);
-  }
+  async submitVote(pollId, { voterName, voterId, impossibleSlots }) {
+    const res = await api('POST', '/api/votes', {
+      pollId, voterName, voterId, impossibleSlots,
+      submittedAt: new Date().toISOString(),
+    });
+    if (!res.ok) throw new Error(res.error);
+  },
 };
+
+// ── Shared utilities ───────────────────────────────────────────────────────
+
+async function api(method, path, body) {
+  try {
+    const opts = {
+      method,
+      headers: body ? { 'Content-Type': 'application/json' } : {},
+      body:    body ? JSON.stringify(body) : undefined,
+    };
+    const res  = await fetch(path, opts);
+    const data = await res.json();
+    return res.ok ? { ok: true, data } : { ok: false, error: data.error || '서버 오류' };
+  } catch (e) {
+    return { ok: false, error: '서버에 연결할 수 없습니다.' };
+  }
+}
 
 async function hashPw(password) {
   const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(password));
@@ -134,7 +114,7 @@ function isExpired(poll) {
 }
 
 function getOptimalSlot(poll) {
-  if (!poll.slots.length || !poll.votes.length) return null;
+  if (!poll.slots?.length || !poll.votes?.length) return null;
   return poll.slots.reduce((best, slot) => {
     const cA = poll.votes.filter(v => v.impossibleSlots.includes(slot.id)).length;
     const cB = poll.votes.filter(v => v.impossibleSlots.includes(best.id)).length;
@@ -145,13 +125,12 @@ function getOptimalSlot(poll) {
 function fmtDt(isoStr) {
   return new Date(isoStr).toLocaleDateString('ko-KR', {
     year: 'numeric', month: 'long', day: 'numeric',
-    weekday: 'short', hour: '2-digit', minute: '2-digit'
+    weekday: 'short', hour: '2-digit', minute: '2-digit',
   });
 }
 
 function votePageUrl(pollId) {
-  const base = location.href.split('#')[0];
-  return `${base}#vote/${pollId}`;
+  return `${location.href.split('#')[0]}#vote/${pollId}`;
 }
 
 db.loadSession();

@@ -1,14 +1,15 @@
 // ---- Browse ----
 
-function renderBrowse() {
-  const all    = db.getAllPolls();
+async function renderBrowse() {
+  showLoading();
+  const all    = await db.getAllPolls();
   const active = all.filter(p => !isExpired(p));
   const closed = all.filter(p =>  isExpired(p));
 
   function card(poll, isClosed) {
-    const section = poll.section ? ` [${poll.section}]` : '';
+    const section  = poll.section ? ` [${poll.section}]` : '';
     const deadline = poll.deadline ? `마감: ${fmtDt(poll.deadline)}` : '';
-    const click = isClosed ? '' : `onclick="nav('vote/${poll.id}')"`;
+    const click    = isClosed ? '' : `onclick="nav('vote/${poll.id}')"`;
     return `
       <div class="poll-card ${isClosed ? 'poll-card-expired' : 'poll-card-clickable'}" ${click}>
         <div class="poll-card-body">
@@ -18,11 +19,9 @@ function renderBrowse() {
         <div class="poll-card-right">
           ${isClosed
             ? '<span class="badge badge-gray">마감</span>'
-            : '<span class="arrow-icon">투표하기 →</span>'
-          }
+            : '<span class="arrow-icon">투표하기 →</span>'}
         </div>
-      </div>
-    `;
+      </div>`;
   }
 
   const activeHtml = active.length === 0
@@ -50,27 +49,28 @@ function renderBrowse() {
       </div>
     </div>
   `;
+  // Store for filter
+  window._browsePolls = all;
 }
 
 function filterBrowse() {
-  const term = document.getElementById('browse-search').value.toLowerCase();
-  const polls = db.getAllPolls();
+  const term  = document.getElementById('browse-search').value.toLowerCase();
+  const polls = window._browsePolls || [];
   const container = document.getElementById('browse-list');
 
-  const filtered = polls.filter(p =>
-    `${p.pollName} ${p.section} ${p.profName}`.toLowerCase().includes(term)
-  );
+  const filtered = term
+    ? polls.filter(p => `${p.pollName} ${p.section} ${p.profName}`.toLowerCase().includes(term))
+    : polls;
 
   if (filtered.length === 0) {
-    container.innerHTML = '<p class="empty-hint">검색 결과가 없습니다.</p>';
-    return;
+    container.innerHTML = '<p class="empty-hint">검색 결과가 없습니다.</p>'; return;
   }
 
   function card(poll) {
     const isClosed = isExpired(poll);
-    const section = poll.section ? ` [${poll.section}]` : '';
+    const section  = poll.section ? ` [${poll.section}]` : '';
     const deadline = poll.deadline ? `마감: ${fmtDt(poll.deadline)}` : '';
-    const click = isClosed ? '' : `onclick="nav('vote/${poll.id}')"`;
+    const click    = isClosed ? '' : `onclick="nav('vote/${poll.id}')"`;
     return `
       <div class="poll-card ${isClosed ? 'poll-card-expired' : 'poll-card-clickable'}" ${click}>
         <div class="poll-card-body">
@@ -80,13 +80,10 @@ function filterBrowse() {
         <div class="poll-card-right">
           ${isClosed
             ? '<span class="badge badge-gray">마감</span>'
-            : '<span class="arrow-icon">투표하기 →</span>'
-          }
+            : '<span class="arrow-icon">투표하기 →</span>'}
         </div>
-      </div>
-    `;
+      </div>`;
   }
-
   container.innerHTML = filtered.slice().reverse().map(card).join('');
 }
 
@@ -94,51 +91,45 @@ function filterBrowse() {
 
 let _voteSlots = new Set();
 
-function renderVote(pollId) {
+async function renderVote(pollId) {
+  showLoading();
   _voteSlots = new Set();
-  const poll = db.getPoll(pollId);
+  const poll = await db.getPoll(pollId);
   const main = document.getElementById('main');
 
   if (!poll) {
     main.innerHTML = `
-      <div class="container-sm">
-        <div class="card text-center">
-          <div class="empty-icon" style="font-size:40px;">🔍</div>
-          <h2 class="page-title">투표를 찾을 수 없습니다</h2>
-          <p class="text-sub" style="margin-top:8px;">링크가 올바른지 확인해주세요.</p>
-          <a href="#browse" class="btn btn-outline" style="margin-top:20px; display:inline-flex;">투표 목록 보기</a>
-        </div>
-      </div>
-    `;
+      <div class="container-sm"><div class="card text-center">
+        <div class="empty-icon" style="font-size:40px;">🔍</div>
+        <h2 class="page-title">투표를 찾을 수 없습니다</h2>
+        <p class="text-sub" style="margin-top:8px;">링크가 올바른지 확인해주세요.</p>
+        <a href="#browse" class="btn btn-outline" style="margin-top:20px;display:inline-flex;">투표 목록 보기</a>
+      </div></div>`;
     return;
   }
 
   if (isExpired(poll)) {
     main.innerHTML = `
-      <div class="container-sm">
-        <div class="card text-center">
-          <div class="empty-icon" style="font-size:40px;">🔒</div>
-          <h2 class="page-title" style="margin-top:8px;">투표가 마감되었습니다</h2>
-          <p class="text-sub" style="margin-top:8px;">${poll.pollName}${poll.section ? ` [${poll.section}]` : ''}</p>
-          <p class="text-sub">마감: ${fmtDt(poll.deadline)}</p>
-          <p class="text-sub" style="margin-top:8px;">총 ${poll.votes.length}명이 참여했습니다.</p>
-          <a href="#browse" class="btn btn-outline" style="margin-top:20px; display:inline-flex;">다른 투표 보기</a>
-        </div>
-      </div>
-    `;
+      <div class="container-sm"><div class="card text-center">
+        <div class="empty-icon" style="font-size:40px;">🔒</div>
+        <h2 class="page-title" style="margin-top:8px;">투표가 마감되었습니다</h2>
+        <p class="text-sub" style="margin-top:8px;">${poll.pollName}${poll.section ? ` [${poll.section}]` : ''}</p>
+        <p class="text-sub">마감: ${fmtDt(poll.deadline)}</p>
+        <p class="text-sub" style="margin-top:8px;">총 ${poll.votes?.length ?? 0}명이 참여했습니다.</p>
+        <a href="#browse" class="btn btn-outline" style="margin-top:20px;display:inline-flex;">다른 투표 보기</a>
+      </div></div>`;
     return;
   }
 
   const sectionTag = poll.section ? ` [${poll.section}]` : '';
-  const slotsHtml = poll.slots.map(slot => `
+  const slotsHtml  = poll.slots.map(slot => `
     <div class="vote-slot" id="vslot-${slot.id}" onclick="toggleVoteSlot(${slot.id})">
       <div>
         <div class="slot-label">${slot.timeText}</div>
         <div class="unavail-label" id="ulabel-${slot.id}">불가능한 경우 체크하세요</div>
       </div>
       <div class="slot-check" id="scheck-${slot.id}"></div>
-    </div>
-  `).join('');
+    </div>`).join('');
 
   main.innerHTML = `
     <div class="container-sm">
@@ -158,10 +149,10 @@ function renderVote(pollId) {
         <input type="text" id="voter-id" placeholder="예: 23011693" inputmode="numeric" />
 
         <div style="margin-top:24px;">
-          <label style="margin-top:0; font-size:14px; font-weight:700; color:var(--text);">
+          <label style="margin-top:0;font-size:14px;font-weight:700;color:var(--text);">
             참석 불가능한 시간대를 선택하세요
           </label>
-          <p style="font-size:12px; color:var(--text-sub); margin-top:4px; margin-bottom:12px;">
+          <p style="font-size:12px;color:var(--text-sub);margin-top:4px;margin-bottom:12px;">
             참석 가능한 시간대는 그냥 두세요. 불가능한 시간만 체크하면 됩니다.
           </p>
         </div>
@@ -177,48 +168,36 @@ function toggleVoteSlot(slotId) {
   const el    = document.getElementById(`vslot-${slotId}`);
   const check = document.getElementById(`scheck-${slotId}`);
   const label = document.getElementById(`ulabel-${slotId}`);
-  const on = el.classList.toggle('checked');
+  const on    = el.classList.toggle('checked');
   check.textContent = on ? '✕' : '';
   label.textContent = on ? '불가능 표시됨' : '불가능한 경우 체크하세요';
-  if (on) _voteSlots.add(slotId);
-  else    _voteSlots.delete(slotId);
+  if (on) _voteSlots.add(slotId); else _voteSlots.delete(slotId);
 }
 
-function submitVote(pollId) {
+async function submitVote(pollId) {
   const name = document.getElementById('voter-name').value.trim();
   const id   = document.getElementById('voter-id').value.trim();
   if (!name) return alert('이름을 입력해주세요.');
   if (!id)   return alert('학번을 입력해주세요.');
   if (!/^\d+$/.test(id)) return alert('학번은 숫자만 입력해주세요.');
   try {
-    db.submitVote(pollId, {
-      voterName: name,
-      voterId: id,
-      impossibleSlots: [..._voteSlots]
+    await db.submitVote(pollId, {
+      voterName: name, voterId: id, impossibleSlots: [..._voteSlots],
     });
     renderVoteSuccess(pollId, name);
-  } catch (e) {
-    alert(e.message);
-  }
+  } catch (e) { alert(e.message); }
 }
 
 function renderVoteSuccess(pollId, name) {
-  const poll = db.getPoll(pollId);
-  const main = document.getElementById('main');
-  const sectionTag = poll?.section ? ` [${poll.section}]` : '';
   const impossibleCount = _voteSlots.size;
-
-  main.innerHTML = `
+  document.getElementById('main').innerHTML = `
     <div class="container-sm">
       <div class="card text-center">
         <div class="success-icon">✓</div>
         <h2 class="page-title">투표 완료!</h2>
         <p class="text-sub" style="margin-top:8px;">${name}님의 투표가 제출되었습니다.</p>
-        <p class="text-sub" style="margin-top:4px; font-size:12px;">
-          ${poll?.pollName ?? ''}${sectionTag} ·
-          불가 선택: ${impossibleCount}개
-        </p>
-        <p class="text-sub" style="margin-top:12px; font-size:12px;">
+        <p class="text-sub" style="margin-top:4px;font-size:12px;">불가 선택: ${impossibleCount}개</p>
+        <p class="text-sub" style="margin-top:12px;font-size:12px;">
           결과는 마감 후 교수님이 공개합니다.<br>
           투표를 수정하려면 같은 학번으로 다시 제출하세요.
         </p>
