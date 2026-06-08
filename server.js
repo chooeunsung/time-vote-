@@ -1,7 +1,8 @@
-const http = require('http');
-const fs   = require('fs');
-const path = require('path');
-const url  = require('url');
+const http   = require('http');
+const fs     = require('fs');
+const path   = require('path');
+const url    = require('url');
+const { spawn } = require('child_process');
 
 const DATA_DIR   = path.join(__dirname, 'data');
 const STATIC_DIR = __dirname;
@@ -202,5 +203,51 @@ const server = http.createServer(async (req, res) => {
 
 server.listen(PORT, () => {
   console.log(`\nExamPoll 서버 실행 중 → http://localhost:${PORT}`);
-  console.log('ngrok 으로 외부 공유: npx ngrok http ' + PORT + '\n');
+  startNgrok(PORT);
 });
+
+// ── ngrok 자동 실행 & URL 출력 ─────────────────────────────────────────────
+
+async function getNgrokUrl() {
+  const res  = await fetch('http://localhost:4040/api/tunnels');
+  const data = await res.json();
+  return data.tunnels?.find(t => t.proto === 'https')?.public_url || null;
+}
+
+async function startNgrok(port) {
+  // 이미 ngrok이 실행 중이면 URL만 출력
+  try {
+    const existing = await getNgrokUrl();
+    if (existing) { printNgrokUrl(existing); return; }
+  } catch {}
+
+  // ngrok 프로세스 시작
+  const proc = spawn('npx', ['ngrok', 'http', String(port)], {
+    stdio: 'ignore',
+    detached: false,
+  });
+
+  proc.on('error', () => {
+    console.log('\nngrok 자동 실행 실패. 수동으로 실행하세요:');
+    console.log(`  npx ngrok http ${port}\n`);
+  });
+
+  // 최대 15초 동안 URL 확인
+  let tries = 0;
+  const timer = setInterval(async () => {
+    if (++tries > 30) {
+      clearInterval(timer);
+      console.log('\nngrok URL 확인 실패. http://localhost:4040 에서 직접 확인하세요.\n');
+      return;
+    }
+    try {
+      const publicUrl = await getNgrokUrl();
+      if (publicUrl) { clearInterval(timer); printNgrokUrl(publicUrl); }
+    } catch {}
+  }, 500);
+}
+
+function printNgrokUrl(publicUrl) {
+  console.log(`ngrok 공개 주소    → ${publicUrl}`);
+  console.log('\n학생들에게 위 주소를 공유하세요!\n');
+}
